@@ -29,6 +29,18 @@ import UIKit
 /// The (blurred) overlay view below the popup dialog
 final public class PopupDialogOverlayView: UIView {
 
+    // MARK: - Live blur
+
+    /// When `true`, the background behind the dialog is blurred live with a
+    /// `UIVisualEffectView` instead of a one-time snapshot, so moving content
+    /// (videos, animations, scrolling lists) stays visible while the dialog is
+    /// shown. Defaults to `false`, which keeps the snapshot based blur.
+    /// Set it once (e.g. at app launch) before presenting any dialog.
+    @objc public static var usesLiveBlur: Bool = false
+
+    /// The blur style used when `usesLiveBlur` is `true`.
+    @objc public static var liveBlurStyle: UIBlurEffect.Style = .systemUltraThinMaterial
+
     // MARK: - Appearance
 
     /// Turns the blur of the overlay view on or off

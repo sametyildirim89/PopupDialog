@@ -34,6 +34,11 @@ final internal class PresentationController: UIPresentationController {
     
     private var blurredImageView: UIImageView?
 
+    /// Live blur behind the dialog, used when `PopupDialogOverlayView.usesLiveBlur` is set.
+    /// Its `effect` is animated instead of its alpha, since animating the opacity of a
+    /// `UIVisualEffectView` renders incorrectly.
+    private var liveBlurView: UIVisualEffectView?
+
     override var shouldRemovePresentersView: Bool {
         return false
     }
@@ -75,7 +80,14 @@ final internal class PresentationController: UIPresentationController {
         
         blurredImageView?.removeFromSuperview()
         blurredImageView = nil
-        
+        liveBlurView?.removeFromSuperview()
+        liveBlurView = nil
+
+        if PopupDialogOverlayView.usesLiveBlur {
+            presentLiveBlur(in: containerView)
+            return
+        }
+
         var targetView: UIView?
         
         if let navController = presentingViewController as? UINavigationController,
@@ -111,17 +123,51 @@ final internal class PresentationController: UIPresentationController {
         }, completion: nil)
     }
 
+    private func presentLiveBlur(in containerView: UIView) {
+        let blurView = UIVisualEffectView(effect: nil)
+        blurView.frame = containerView.bounds
+        blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        containerView.addSubview(blurView)
+        liveBlurView = blurView
+
+        overlay.frame = containerView.bounds
+        containerView.addSubview(overlay)
+
+        if let presentedView = presentedView {
+            containerView.addSubview(presentedView)
+        }
+
+        let blurEffect = UIBlurEffect(style: PopupDialogOverlayView.liveBlurStyle)
+
+        guard let coordinator = presentedViewController.transitionCoordinator else {
+            blurView.effect = blurEffect
+            overlay.alpha = 1.0
+            return
+        }
+
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            self?.liveBlurView?.effect = blurEffect
+            self?.overlay.alpha = 1.0
+        }, completion: nil)
+    }
+
     override func dismissalTransitionWillBegin() {
         guard let coordinator = presentedViewController.transitionCoordinator else { return }
-        
+
+        let liveBlurEffect = liveBlurView?.effect
+
         coordinator.animate(alongsideTransition: { [weak self] _ in
             self?.overlay.alpha = 0.0
+            self?.liveBlurView?.effect = nil
         }, completion: { [weak self] context in
             if context.isCancelled {
                 self?.overlay.alpha = 1.0
+                self?.liveBlurView?.effect = liveBlurEffect
             } else {
                 self?.blurredImageView?.removeFromSuperview()
                 self?.blurredImageView = nil
+                self?.liveBlurView?.removeFromSuperview()
+                self?.liveBlurView = nil
             }
         })
     }
@@ -133,6 +179,7 @@ final internal class PresentationController: UIPresentationController {
         presentedView.frame = frameOfPresentedViewInContainerView
         overlay.frame = containerView?.bounds ?? .zero
         blurredImageView?.frame = containerView?.bounds ?? .zero
+        liveBlurView?.frame = containerView?.bounds ?? .zero
     }
 
 }
